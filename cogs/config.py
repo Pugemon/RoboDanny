@@ -31,10 +31,12 @@ class PlonkedPageSource(menus.AsyncIteratorPageSource):
 
     async def format_page(self, menu: RoboPages, entries: list[str]):
         embed = discord.Embed(colour=discord.Colour.blurple())
-        pages = []
-        for index, entry in enumerate(entries, start=menu.current_page * self.per_page):
-            pages.append(f'{index + 1}. {entry}')
-
+        pages = [
+            f'{index + 1}. {entry}'
+            for index, entry in enumerate(
+                entries, start=menu.current_page * self.per_page
+            )
+        ]
         embed.description = '\n'.join(pages)
         return embed
 
@@ -201,13 +203,12 @@ class Config(commands.Cog):
         if channel is None:
             query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id=$2;"
             row = await connection.fetchrow(query, guild_id, member_id)
+        elif isinstance(channel, discord.Thread):
+            query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3, $4);"
+            row = await connection.fetchrow(query, guild_id, member_id, channel.id, channel.parent_id)
         else:
-            if isinstance(channel, discord.Thread):
-                query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3, $4);"
-                row = await connection.fetchrow(query, guild_id, member_id, channel.id, channel.parent_id)
-            else:
-                query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3);"
-                row = await connection.fetchrow(query, guild_id, member_id, channel.id)
+            query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3);"
+            row = await connection.fetchrow(query, guild_id, member_id, channel.id)
 
         return row is not None
 
@@ -293,7 +294,7 @@ class Config(commands.Cog):
         To use this command you must have Ban Members and Manage Messages permissions.
         """
 
-        if len(entities) == 0:
+        if not entities:
             # shortcut for a single insert
             query = "INSERT INTO plonks (guild_id, entity_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;"
             await ctx.db.execute(query, ctx.guild.id, ctx.channel.id)
@@ -363,7 +364,7 @@ class Config(commands.Cog):
         To use this command you must have Ban Members and Manage Messages permissions.
         """
 
-        if len(entities) == 0:
+        if not entities:
             query = "DELETE FROM plonks WHERE guild_id=$1 AND entity_id=$2;"
             await ctx.db.execute(query, ctx.guild.id, ctx.channel.id)
         else:

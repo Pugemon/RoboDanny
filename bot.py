@@ -55,8 +55,7 @@ def _prefix_callable(bot: RoboDanny, msg: discord.Message):
     user_id = bot.user.id
     base = [f'<@!{user_id}> ', f'<@{user_id}> ']
     if msg.guild is None:
-        base.append('!')
-        base.append('?')
+        base.extend(('!', '?'))
     else:
         base.extend(bot.prefixes.get(msg.guild.id, ['?', '!']))
     return base
@@ -180,7 +179,7 @@ class RoboDanny(commands.AutoShardedBot):
         return self.prefixes.get(guild_id, ['?', '!'])
 
     async def set_guild_prefixes(self, guild: discord.abc.Snowflake, prefixes: list[str]) -> None:
-        if len(prefixes) == 0:
+        if not prefixes:
             await self.prefixes.put(guild.id, [])
         elif len(prefixes) > 10:
             raise RuntimeError('Cannot have more than 10 custom prefixes.')
@@ -253,9 +252,7 @@ class RoboDanny(commands.AutoShardedBot):
                 return member
 
         members = await guild.query_members(limit=1, user_ids=[member_id], cache=True)
-        if not members:
-            return None
-        return members[0]
+        return None if not members else members[0]
 
     async def resolve_member_ids(self, guild: discord.Guild, member_ids: Iterable[int]) -> AsyncIterator[discord.Member]:
         """Bulk resolves member IDs to member instances, if possible.
@@ -327,8 +324,7 @@ class RoboDanny(commands.AutoShardedBot):
     @discord.utils.cached_property
     def stats_webhook(self) -> discord.Webhook:
         wh_id, wh_token = self.config.stat_webhook
-        hook = discord.Webhook.partial(id=wh_id, token=wh_token, session=self.session)
-        return hook
+        return discord.Webhook.partial(id=wh_id, token=wh_token, session=self.session)
 
     async def log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = False):
         guild_name = getattr(ctx.guild, 'name', 'No Guild (DMs)')

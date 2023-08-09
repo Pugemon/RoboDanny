@@ -53,15 +53,10 @@ def get_shortened_string(length: int, start: int, string: str) -> str:
     max_remaining_length = 100 - start_index
 
     end = start + length
-    if start < start_index:
-        start = start_index
-
+    start = max(start, start_index)
     # If the match is near the beginning then just extend it to the end
     if end < 100:
-        if full_length > 100:
-            return string[:99] + '…'
-        return string[:100]
-
+        return f'{string[:99]}…'
     has_end = end < full_length
     excess = (end - start) - max_remaining_length + 1
     if has_end:
@@ -249,14 +244,13 @@ class TodoItem:
             embed.set_author(name=author, icon_url=author.display_avatar)
             if self.content:
                 embed.add_field(name='Content', value=self.content, inline=False)
-        else:
-            if self.cached_content is not None:
-                embed.description = self.cached_content
-                if self.content:
-                    embed.add_field(name='Content', value=self.content, inline=False)
-            else:
-                embed.description = self.content
+        elif self.cached_content is None:
+            embed.description = self.content
 
+        else:
+            embed.description = self.cached_content
+            if self.content:
+                embed.add_field(name='Content', value=self.content, inline=False)
         if url:
             embed.add_field(name='Jump to Message', value=f'[Jump!]({url})', inline=False)
 
@@ -361,17 +355,16 @@ class EditDueDateModal(ui.Modal, title='Edit Due Date'):
             self.due_date.min_length = 2
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        value = self.due_date.value
-        if not value:
-            due_date = None
-            timezone = MISSING
-        else:
+        if value := self.due_date.value:
             try:
                 timezone, due_date = await future_time_from_interaction(value, interaction)
             except InvalidTime as e:
                 await interaction.response.send_message(str(e), ephemeral=True)
                 return
 
+        else:
+            due_date = None
+            timezone = MISSING
         await interaction.response.defer(ephemeral=True)
         await self.item.edit(due_date=due_date, timezone=timezone)
         if due_date is None:
@@ -848,9 +841,7 @@ class Todo(commands.Cog):
                    ORDER BY due_date AT TIME ZONE timezone LIMIT 1
                 """
         record = await self.bot.pool.fetchrow(query)
-        if record is None:
-            return None
-        return ActiveDueTodo(self, record)
+        return None if record is None else ActiveDueTodo(self, record)
 
     async def run_due_date_reminders(self) -> None:
         try:
@@ -879,7 +870,11 @@ class Todo(commands.Cog):
             else:
                 dm = await user.create_dm()
             view = DueTodoView(todo)
-            view.message = await dm.send(f'You asked to be reminded of this todo', embed=todo.embed, view=view)
+            view.message = await dm.send(
+                'You asked to be reminded of this todo',
+                embed=todo.embed,
+                view=view,
+            )
         except:
             log.warning('Could not send due date reminder to %s', todo.user_id)
 
@@ -926,9 +921,7 @@ class Todo(commands.Cog):
         if due_date is not None and due_date.tzinfo is not None:
             due_date = due_date.astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
-        parameters.append(due_date)
-        parameters.append(content)
-        parameters.append(timezone)
+        parameters.extend((due_date, content, timezone))
         record = await self.bot.pool.fetchrow(query, *parameters)
         result = TodoItem(self, record)
         result.message = message
@@ -947,9 +940,7 @@ class Todo(commands.Cog):
     async def get_timezone(self, user_id, /) -> str:
         query = 'SELECT timezone FROM user_settings WHERE id = $1;'
         record = await self.bot.pool.fetchrow(query, user_id)
-        if record is not None and record[0] is not None:
-            return record[0]
-        return 'UTC'
+        return record[0] if record is not None and record[0] is not None else 'UTC'
 
     @commands.hybrid_group()
     async def todo(self, ctx: Context) -> None:
@@ -1106,10 +1097,10 @@ class Todo(commands.Cog):
         todos = [TodoItem(self, record) for record in todos]
         if flags.brief or ctx.invoked_with in ('brief', 'compact'):
             pages = RoboPages(BriefTodoPageSource(todos), ctx=ctx, compact=True)
-            await pages.start(ephemeral=flags.private)
         else:
             pages = TodoPages(todos, ctx=ctx)
-            await pages.start(ephemeral=flags.private)
+
+        await pages.start(ephemeral=flags.private)
 
     @todo_list.error
     async def todo_list_error(self, ctx: Context, error: Exception):

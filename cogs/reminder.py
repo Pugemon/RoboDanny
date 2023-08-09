@@ -186,9 +186,7 @@ class Timer:
 
     @property
     def author_id(self) -> Optional[int]:
-        if self.args:
-            return int(self.args[0])
-        return None
+        return int(self.args[0]) if self.args else None
 
     def __repr__(self) -> str:
         return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'

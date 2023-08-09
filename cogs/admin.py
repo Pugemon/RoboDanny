@@ -223,10 +223,7 @@ class Admin(commands.Cog):
             'guild': ctx.guild,
             'message': ctx.message,
             '_': self._last_result,
-        }
-
-        env.update(globals())
-
+        } | globals()
         body = self.cleanup_code(body)
         stdout = io.StringIO()
 
@@ -360,12 +357,7 @@ class Admin(commands.Cog):
 
         is_multistatement = query.count(';') > 1
         strategy: Callable[[str], Union[Awaitable[list[Record]], Awaitable[str]]]
-        if is_multistatement:
-            # fetch does not support multiple statements
-            strategy = ctx.db.execute
-        else:
-            strategy = ctx.db.fetch
-
+        strategy = ctx.db.execute if is_multistatement else ctx.db.fetch
         try:
             start = time.perf_counter()
             results = await strategy(query)
@@ -416,7 +408,7 @@ class Admin(commands.Cog):
 
         results: list[Record] = await ctx.db.fetch(query, table_name)
 
-        if len(results) == 0:
+        if not results:
             await ctx.send('Could not find a table with that name')
             return
 
@@ -433,7 +425,7 @@ class Admin(commands.Cog):
 
         results: list[Record] = await ctx.db.fetch(query)
 
-        if len(results) == 0:
+        if not results:
             await ctx.send('Could not find any tables')
             return
 
@@ -456,7 +448,7 @@ class Admin(commands.Cog):
 
         results: list[Record] = await ctx.db.fetch(query)
 
-        if len(results) == 0:
+        if not results:
             await ctx.send('Could not find any tables')
             return
 
@@ -505,7 +497,7 @@ class Admin(commands.Cog):
 
         new_ctx = await self.bot.get_context(msg, cls=type(ctx))
 
-        for i in range(times):
+        for _ in range(times):
             await new_ctx.reinvoke()
 
     @commands.command(hidden=True)
@@ -516,11 +508,7 @@ class Admin(commands.Cog):
         async with ctx.typing():
             stdout, stderr = await self.run_process(command)
 
-        if stderr:
-            text = f'stdout:\n{stdout}\nstderr:\n{stderr}'
-        else:
-            text = stdout
-
+        text = f'stdout:\n{stdout}\nstderr:\n{stderr}' if stderr else stdout
         pages = RoboPages(TextPageSource(text), ctx=ctx)
         await pages.start()
 
@@ -562,11 +550,7 @@ class Admin(commands.Cog):
     async def sync(self, ctx: GuildContext, guild_id: Optional[int], copy: bool = False) -> None:
         """Syncs the slash commands with the given guild"""
 
-        if guild_id:
-            guild = discord.Object(id=guild_id)
-        else:
-            guild = ctx.guild
-
+        guild = discord.Object(id=guild_id) if guild_id else ctx.guild
         if copy:
             self.bot.tree.copy_global_to(guild=guild)
 

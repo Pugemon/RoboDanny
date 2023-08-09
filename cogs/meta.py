@@ -430,17 +430,16 @@ class Meta(commands.Cog):
             filename = src.co_filename
 
         lines, firstlineno = inspect.getsourcelines(src)
-        if not module.startswith('discord'):
-            # not a built-in command
-            if filename is None:
-                return await ctx.send('Could not find source for command.')
-
-            location = os.path.relpath(filename).replace('\\', '/')
-        else:
+        if module.startswith('discord'):
             location = module.replace('.', '/') + '.py'
             source_url = 'https://github.com/Rapptz/discord.py'
             branch = 'master'
 
+        elif filename is None:
+            return await ctx.send('Could not find source for command.')
+
+        else:
+            location = os.path.relpath(filename).replace('\\', '/')
         final_url = f'<{source_url}/blob/{branch}/{location}#L{firstlineno}-L{firstlineno + len(lines) - 1}>'
         await ctx.send(final_url)
 
@@ -560,9 +559,7 @@ class Meta(commands.Cog):
     async def on_info_error(self, ctx: Context, error: commands.CommandError):
         if isinstance(error, commands.BadUnionArgument):
             error = error.errors[-1]
-            await ctx.send(str(error))
-        else:
-            await ctx.send(str(error))
+        await ctx.send(str(error))
 
     @commands.command(aliases=['guildinfo'], usage='')
     @commands.guild_only()
@@ -572,7 +569,7 @@ class Meta(commands.Cog):
         if guild_id is not None and await self.bot.is_owner(ctx.author):
             guild = self.bot.get_guild(guild_id)
             if guild is None:
-                return await ctx.send(f'Invalid Guild ID given.')
+                return await ctx.send('Invalid Guild ID given.')
         else:
             guild = ctx.guild
 
@@ -609,18 +606,16 @@ class Meta(commands.Cog):
             discord.VoiceChannel: '<:voice_channel:586339098524909604>',
         }
         for key, total in totals.items():
-            secrets = secret[key]
             try:
                 emoji = key_to_emoji[key]
             except KeyError:
                 continue
 
-            if secrets:
+            if secrets := secret[key]:
                 channel_info.append(f'{emoji} {total} ({secrets} locked)')
             else:
                 channel_info.append(f'{emoji} {total}')
 
-        info = []
         features = set(guild.features)
         all_features = {
             'PARTNERED': 'Partnered',
@@ -639,11 +634,11 @@ class Meta(commands.Cog):
             'BANNER': 'Banner',
         }
 
-        for feature, label in all_features.items():
-            if feature in features:
-                info.append(f'{ctx.tick(True)}: {label}')
-
-        if info:
+        if info := [
+            f'{ctx.tick(True)}: {label}'
+            for feature, label in all_features.items()
+            if feature in features
+        ]:
             e.add_field(name='Features', value='\n'.join(info))
 
         e.add_field(name='Channels', value='\n'.join(channel_info))

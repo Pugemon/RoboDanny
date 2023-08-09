@@ -159,9 +159,10 @@ class RemoveNoise(logging.Filter):
         super().__init__(name='discord.state')
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if record.levelname == 'WARNING' and 'referencing an unknown' in record.msg:
-            return False
-        return True
+        return (
+            record.levelname != 'WARNING'
+            or 'referencing an unknown' not in record.msg
+        )
 
 
 @contextlib.contextmanager
@@ -262,7 +263,7 @@ def init(reason):
     migrations.database_uri = config.postgresql
     revision = migrations.create_revision(reason)
     click.echo(f'created revision V{revision.version!r}')
-    click.secho(f'hint: use the `upgrade` command to apply', fg='yellow')
+    click.secho('hint: use the `upgrade` command to apply', fg='yellow')
 
 
 @db.command()

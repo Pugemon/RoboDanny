@@ -15,9 +15,7 @@ class BoardKind(enum.Enum):
     def __str__(self) -> str:
         if self is self.X:
             return '\N{LARGE BLUE SQUARE}'
-        if self is self.O:
-            return '\N{LARGE GREEN SQUARE}'
-        return '\u200b'
+        return '\N{LARGE GREEN SQUARE}' if self is self.O else '\u200b'
 
     @property
     def style(self) -> discord.ButtonStyle:
@@ -249,11 +247,7 @@ class Prompt(discord.ui.View):
     @discord.ui.button(label='Accept', style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         coin = random.randint(0, 1)
-        if coin == 0:
-            order = (self.first, self.second)
-        else:
-            order = (self.second, self.first)
-
+        order = (self.first, self.second) if coin == 0 else (self.second, self.first)
         players = (
             Player(member=order[0], kind=BoardKind.X, pieces={1, 2, 3, 4, 5, 6}),
             Player(member=order[1], kind=BoardKind.O, pieces={1, 2, 3, 4, 5, 6}),

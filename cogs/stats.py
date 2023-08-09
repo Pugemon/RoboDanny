@@ -69,10 +69,7 @@ def hex_value(arg: str) -> int:
 
 
 def object_at(addr: int) -> Optional[Any]:
-    for o in gc.get_objects():
-        if id(o) == addr:
-            return o
-    return None
+    return next((o for o in gc.get_objects() if id(o) == addr), None)
 
 
 class Stats(commands.Cog):
@@ -93,7 +90,8 @@ class Stats(commands.Cog):
         return discord.PartialEmoji(name='\N{BAR CHART}')
 
     async def bulk_insert(self) -> None:
-        query = """INSERT INTO commands (guild_id, channel_id, author_id, used, prefix, command, failed, app_command)
+        if self._data_batch:
+            query = """INSERT INTO commands (guild_id, channel_id, author_id, used, prefix, command, failed, app_command)
                    SELECT x.guild, x.channel, x.author, x.used, x.prefix, x.command, x.failed, x.app_command
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(
@@ -108,7 +106,6 @@ class Stats(commands.Cog):
                     )
                 """
 
-        if self._data_batch:
             await self.bot.pool.execute(query, self._data_batch)
             total = len(self._data_batch)
             if total > 1:
@@ -193,8 +190,9 @@ class Stats(commands.Cog):
     @discord.utils.cached_property
     def webhook(self) -> discord.Webhook:
         wh_id, wh_token = self.bot.config.stat_webhook
-        hook = discord.Webhook.partial(id=wh_id, token=wh_token, session=self.bot.session)
-        return hook
+        return discord.Webhook.partial(
+            id=wh_id, token=wh_token, session=self.bot.session
+        )
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -244,7 +242,7 @@ class Stats(commands.Cog):
 
     def format_commit(self, commit: pygit2.Commit) -> str:
         short, _, _ = commit.message.partition('\n')
-        short_sha2 = commit.hex[0:6]
+        short_sha2 = commit.hex[:6]
         commit_tz = datetime.timezone(datetime.timedelta(minutes=commit.commit_time_offset))
         commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(commit_tz)
 
@@ -755,9 +753,12 @@ class Stats(commands.Cog):
         spam_control = self.bot.spam_control
         being_spammed = [str(key) for key, value in spam_control._cache.items() if value._tokens == 0]
 
-        description.append(f'Current Spammers: {", ".join(being_spammed) if being_spammed else "None"}')
-        description.append(f'Questionable Connections: {questionable_connections}')
-
+        description.extend(
+            (
+                f'Current Spammers: {", ".join(being_spammed) if being_spammed else "None"}',
+                f'Questionable Connections: {questionable_connections}',
+            )
+        )
         total_warnings += questionable_connections
         if being_spammed:
             embed.colour = WARNING
@@ -1015,7 +1016,7 @@ class Stats(commands.Cog):
         as_data = sorted(all_commands.items(), key=lambda t: t[1], reverse=True)
         table = formats.TabularData()
         table.set_columns(['Command', 'Uses'])
-        table.add_rows(tup for tup in as_data)
+        table.add_rows(iter(as_data))
         render = table.render()
 
         embed = discord.Embed(title='Summary', colour=discord.Colour.green())
@@ -1119,8 +1120,7 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     e.timestamp = discord.utils.utcnow()
 
     args_str = ['```py']
-    for index, arg in enumerate(args):
-        args_str.append(f'[{index}]: {arg!r}')
+    args_str.extend(f'[{index}]: {arg!r}' for index, arg in enumerate(args))
     args_str.append('```')
     e.add_field(name='Args', value='\n'.join(args_str), inline=False)
     hook = self.get_cog('Stats').webhook

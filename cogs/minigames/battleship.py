@@ -29,9 +29,7 @@ class Cell:
     def display_emoji(self) -> Optional[str]:
         if self.enemy_state is None:
             return self.emoji
-        if self.enemy_state:
-            return '\N{COLLISION SYMBOL}'
-        return '\N{CYCLONE}'
+        return '\N{COLLISION SYMBOL}' if self.enemy_state else '\N{CYCLONE}'
 
 
 class PlayerState:
@@ -146,7 +144,7 @@ class Button(discord.ui.Button['BoardView']):
             if enemy_cell.button and enemy_cell.button.view:
                 enemy_cell.button.update()
                 view = enemy_cell.button.view
-                await view.message.edit(content=f'You lose :(', view=view)
+                await view.message.edit(content='You lose :(', view=view)
 
             await self.view.parent_message.edit(
                 content=f'{player.member.mention} wins this game of Battleship! Congratulations.'

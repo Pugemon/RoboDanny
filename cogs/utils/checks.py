@@ -83,9 +83,7 @@ def is_admin():
 def is_in_guilds(*guild_ids: int):
     def predicate(ctx: GuildContext) -> bool:
         guild = ctx.guild
-        if guild is None:
-            return False
-        return guild.id in guild_ids
+        return False if guild is None else guild.id in guild_ids
 
     return commands.check(predicate)
 
