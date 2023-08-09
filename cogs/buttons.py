@@ -49,7 +49,22 @@ def html_to_markdown(node: Any, *, include_spans: bool = False, base_url: Option
     italics_marker = '_'
 
     for child in node:
-        if child.tag == 'i':
+        if (
+            child.tag != 'i'
+            and child.tag != 'b'
+            and child.tag == 'a'
+            and base_url is None
+            or child.tag != 'i'
+            and child.tag != 'b'
+            and child.tag != 'a'
+            and include_spans
+            and child.tag == 'span'
+        ):
+            text.append(child.text)
+        elif child.tag != 'i' and child.tag != 'b' and child.tag == 'a':
+            url = base_url.join(yarl.URL(child.attrib['href']))
+            text.append(f'[{child.text}]({url})')
+        elif child.tag == 'i':
             text.append(f'{italics_marker}{child.text.strip()}{italics_marker}')
             italics_marker = '_' if italics_marker == '*' else '*'
         elif child.tag == 'b':
@@ -57,16 +72,6 @@ def html_to_markdown(node: Any, *, include_spans: bool = False, base_url: Option
                 text.append('\u200b')
 
             text.append(f'**{child.text.strip()}**')
-        elif child.tag == 'a':
-            # No markup for links
-            if base_url is None:
-                text.append(child.text)
-            else:
-                url = base_url.join(yarl.URL(child.attrib['href']))
-                text.append(f'[{child.text}]({url})')
-        elif include_spans and child.tag == 'span':
-            text.append(child.text)
-
         if child.tail:
             text.append(child.tail)
 
@@ -97,8 +102,7 @@ class FreeDictionaryDefinition(NamedTuple):
         definition = inner_trim(definition)
 
         example: Optional[str] = None
-        example_nodes = node.xpath("./span[@class='illustration']")
-        if example_nodes:
+        if example_nodes := node.xpath("./span[@class='illustration']"):
             example = example_nodes[0].text_content()
 
         children: list[FreeDictionaryDefinition] = [cls.from_node(child) for child in node.xpath("./div[@class='sds-list']")]
@@ -176,8 +180,7 @@ class FreeDictionaryWord:
             return None
 
         snd = snd[0]
-        pron = node.xpath("span[@class='pron']")
-        if pron:
+        if pron := node.xpath("span[@class='pron']"):
             self.pronunciation = pron[0].text_content() + (pron[0].tail or '')
             self.pronunciation = self.pronunciation.strip()
 
@@ -337,9 +340,7 @@ async def free_dictionary_autocomplete_query(session: ClientSession, *, query: s
             return []
 
         js = await resp.json()
-        if len(js) == 2:
-            return js[1]
-        return []
+        return js[1] if len(js) == 2 else []
 
 
 class FreeDictionaryWordMeaningPageSource(menus.ListPageSource):
@@ -379,9 +380,7 @@ class UrbanDictionaryPageSource(menus.ListPageSource):
             return f'[{word}](http://{word.replace(" ", "-")}.urbanup.com)'
 
         ret = regex.sub(repl, definition)
-        if len(ret) >= 2048:
-            return ret[0:2000] + ' [...]'
-        return ret
+        return f'{ret[:2000]} [...]' if len(ret) >= 2048 else ret
 
     async def format_page(self, menu: RoboPages, entry: dict[str, Any]):
         maximum = self.get_max_pages()
@@ -398,7 +397,7 @@ class UrbanDictionaryPageSource(menus.ListPageSource):
             embed.add_field(name='Votes', value=f'\N{THUMBS UP SIGN} {up} \N{THUMBS DOWN SIGN} {down}', inline=False)
 
         try:
-            date = discord.utils.parse_time(entry['written_on'][0:-1])
+            date = discord.utils.parse_time(entry['written_on'][:-1])
         except (ValueError, KeyError):
             pass
         else:
@@ -457,9 +456,7 @@ class Unit(NamedTuple):
     @property
     def display_unit(self) -> str:
         # Work around the fact that ° can't be used in group names
-        if self.unit in ('F', 'C'):
-            return f'°{self.unit}'
-        return f' {self.unit}'
+        return f'°{self.unit}' if self.unit in ('F', 'C') else f' {self.unit}'
 
 
 class UnitCollector(commands.Converter):
@@ -482,7 +479,7 @@ class UnitCollector(commands.Converter):
 class RedditMediaURL:
     def __init__(self, url: yarl.URL):
         self.url: yarl.URL = url
-        self.filename: str = url.parts[1] + '.mp4'
+        self.filename: str = f'{url.parts[1]}.mp4'
 
     @classmethod
     async def convert(cls, ctx: Context, argument: str) -> Self:
@@ -571,8 +568,7 @@ class SpoilerCache:
             value = '\n'.join(f'[{a.filename}]({a.url})' for a in attachments)
             embed.add_field(name='Attachments', value=value, inline=False)
 
-        user = bot.get_user(self.author_id)
-        if user:
+        if user := bot.get_user(self.author_id):
             embed.set_author(name=str(user), icon_url=user.display_avatar.url)
 
         return embed
@@ -666,18 +662,12 @@ class Buttons(commands.Cog):
     @property
     def feedback_channel(self) -> Optional[discord.TextChannel]:
         guild = self.bot.get_guild(182325885867786241)
-        if guild is None:
-            return None
-
-        return guild.get_channel(263814407191134218)  # type: ignore
+        return None if guild is None else guild.get_channel(263814407191134218)
 
     @property
     def storage_channel(self) -> Optional[discord.TextChannel]:
         guild = self.bot.get_guild(182325885867786241)
-        if guild is None:
-            return None
-
-        return guild.get_channel(430229522340773899)  # type: ignore
+        return None if guild is None else guild.get_channel(430229522340773899)
 
     @commands.command(hidden=True)
     async def feelgood(self, ctx: Context):

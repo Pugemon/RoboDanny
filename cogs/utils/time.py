@@ -259,9 +259,9 @@ class UserFriendlyTime(commands.Converter):
         if argument.endswith('from now'):
             argument = argument[:-8].strip()
 
-        if argument[0:2] == 'me':
+        if argument[:2] == 'me':
             # starts with "me to", "me in", or "me at "
-            if argument[0:6] in ('me to ', 'me in ', 'me at '):
+            if argument[:6] in ('me to ', 'me in ', 'me at '):
                 argument = argument[6:]
 
         # Have to adjust the timezone so pdt knows how to handle things like "tomorrow at 6pm" in an aware way
@@ -305,7 +305,7 @@ class UserFriendlyTime(commands.Converter):
                 if argument[0] != '"':
                     raise commands.BadArgument('Expected quote before time input...')
 
-                if not (end < len(argument) and argument[end] == '"'):
+                if end >= len(argument) or argument[end] != '"':
                     raise commands.BadArgument('If the time is quoted, you must unquote it.')
 
                 remaining = argument[end + 1 :].lstrip(' ,.!')
@@ -364,13 +364,12 @@ def human_timedelta(
 
     output = []
     for attr, brief_attr in attrs:
-        elem = getattr(delta, attr + 's')
+        elem = getattr(delta, f'{attr}s')
         if not elem:
             continue
 
         if attr == 'day':
-            weeks = delta.weeks
-            if weeks:
+            if weeks := delta.weeks:
                 elem -= weeks * 7
                 if not brief:
                     output.append(format(plural(weeks), 'week'))
@@ -390,11 +389,11 @@ def human_timedelta(
 
     if len(output) == 0:
         return 'now'
+    if brief:
+        return ' '.join(output) + output_suffix
+
     else:
-        if not brief:
-            return human_join(output, final='and') + output_suffix
-        else:
-            return ' '.join(output) + output_suffix
+        return human_join(output, final='and') + output_suffix
 
 
 def format_relative(dt: datetime.datetime) -> str:

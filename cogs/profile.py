@@ -53,10 +53,7 @@ class DisambiguateMember(commands.IDConverter, app_commands.Transformer):
                 ]
 
                 def to_str(m):
-                    if m.nick:
-                        return f'{m} (a.k.a {m.nick})'
-                    else:
-                        return str(m)
+                    return f'{m} (a.k.a {m.nick})' if m.nick else str(m)
 
                 entry = to_str
 
@@ -308,11 +305,13 @@ class Profile(commands.Cog):
         e.set_author(name=member.display_name, icon_url=member.display_avatar.with_format('png'))
 
         extra = record['extra'] or {}
-        rank = extra.get('sp3_rank', {})
-        value = 'Unranked'
-        if rank:
-            value = '\n'.join(f'{mode}: {data["rank"]}{data["number"]}' for mode, data in rank.items())
-
+        if rank := extra.get('sp3_rank', {}):
+            value = '\n'.join(
+                f'{mode}: {data["rank"]}{data["number"]}'
+                for mode, data in rank.items()
+            )
+        else:
+            value = 'Unranked'
         e.add_field(name='Splatoon 3 Ranks', value=value)
 
         weapon = extra.get('sp3_weapon')
@@ -470,8 +469,7 @@ class Profile(commands.Cog):
             'squad': 'squad',
         }
 
-        column = field_to_column.get(field)
-        if column:
+        if column := field_to_column.get(field):
             query = f"UPDATE profiles SET {column} = NULL WHERE id=$1;"
             await ctx.db.execute(query, ctx.author.id)
             return await ctx.send(f'Successfully deleted {field} field.')

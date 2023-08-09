@@ -46,8 +46,7 @@ class RNG(commands.Cog):
             return await ctx.send('Splatoon commands currently disabled.')
 
         count = min(max(count, 1), 8)
-        weapons = splatoon.splat3_data.get('weapons', [])
-        if weapons:
+        if weapons := splatoon.splat3_data.get('weapons', []):
             if count == 1:
                 weapon = rng.choice(weapons)
                 await ctx.send(f'{weapon.name} with {weapon.sub} and {weapon.special} special.')
@@ -75,9 +74,7 @@ class RNG(commands.Cog):
         weapons = rng.sample(splatoon.splat3_data.get('weapons', []), 8)
         for i in range(8):
             if i == 4:
-                result.append('')
-                result.append('**Team Bravo**')
-
+                result.extend(('', '**Team Bravo**'))
             result.append(f'Player {i + 1}: {weapons[i].name}')
 
         await ctx.send('\n'.join(result))
@@ -107,8 +104,7 @@ class RNG(commands.Cog):
             await ctx.send('Splatoon commands currently disabled.')
             return
 
-        maps = splatoon.splat3_data.get('maps', [])
-        if maps:
+        if maps := splatoon.splat3_data.get('maps', []):
             await ctx.send(rng.choice(maps))
 
         del splatoon
@@ -127,8 +123,7 @@ class RNG(commands.Cog):
             await ctx.send('Splatoon commands currently disabled.')
             return
 
-        maps = splatoon.splat3_data.get('maps', [])
-        if maps:
+        if maps := splatoon.splat3_data.get('maps', []):
             mode = rng.choice(['Splat Zones', 'Tower Control', 'Rainmaker', 'Clam Blitz'])
             stage = rng.choice(maps)
             await ctx.send(f'{mode} on {stage}')
@@ -184,7 +179,7 @@ class RNG(commands.Cog):
         wins_needed = (best_of // 2) + 1
         wins: list[int] = [0, 0]
         results: list[str] = []
-        for i in range(best_of):
+        for _ in range(best_of):
             winner = rng.choice([0, 1])
             wins[winner] += 1
             choice = first if winner == 0 else second
@@ -197,19 +192,12 @@ class RNG(commands.Cog):
     def _simulate_double_elimination(self, first: str, second: str, third: str) -> list[str]:
         """Simulates a double elimination tournament between three choices."""
 
-        # Bracket visualisation:
-        # T1 vs T2 => W1
-        # T3 vs W1 => W2
-        # L1 vs L2 => W3
-        # W2 vs W3 => W4
-        # if W2 wins => champion
-        # if W3 wins, W2 vs W3 again for champion
-
-        to_send: list[str] = []
         # First round is Bo3
         winner, results = self._bestof_choices(first, second, 3)
         formatted_results = ', '.join('Win' if r == winner else 'Loss' for r in results)
-        to_send.append(f'1. {first} vs {second}: {winner} wins! ({formatted_results})')
+        to_send: list[str] = [
+            f'1. {first} vs {second}: {winner} wins! ({formatted_results})'
+        ]
         loser = first if winner == second else second
         # Second round is also Bo3
         second_winner, results = self._bestof_choices(winner, third, 3)
@@ -277,9 +265,10 @@ class RNG(commands.Cog):
                 winners[winner] += 1
 
         to_send.append('**Final Results:**')
-        for winner, wins in winners.most_common():
-            to_send.append(f'- {winner} has {plural(wins):win}')
-
+        to_send.extend(
+            f'- {winner} has {plural(wins):win}'
+            for winner, wins in winners.most_common()
+        )
         return to_send
 
     @commands.command()
@@ -296,8 +285,10 @@ class RNG(commands.Cog):
             first, second = choices
             winner, games = self._bestof_choices(first, second, 5)
             results.append(f'{first} vs {second}:')
-            for index, result in enumerate(games, start=1):
-                results.append(f'Round {index}: {result} wins')
+            results.extend(
+                f'Round {index}: {result} wins'
+                for index, result in enumerate(games, start=1)
+            )
             results.append(f'**{winner} wins**')
         elif len(choices) == 3:
             results = self._simulate_double_elimination(choices[0], choices[1], choices[2])

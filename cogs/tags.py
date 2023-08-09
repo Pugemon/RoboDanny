@@ -179,7 +179,7 @@ class Tags(commands.Cog):
         """Returns a random tag."""
 
         con = connection or self.bot.pool
-        query = f"""SELECT name, content
+        query = """SELECT name, content
                     FROM tags
                     WHERE location_id=$1
                     OFFSET FLOOR(RANDOM() * (
@@ -622,16 +622,12 @@ class Tags(commands.Cog):
 
         if len(records) < 3:
             # fill with data to ensure that we have a minimum of 3
-            records.extend((None, None, None, None) for i in range(0, 3 - len(records)))
+            records.extend((None, None, None, None) for _ in range(0, 3 - len(records)))
 
         emoji = 129351  # ord(':first_place:')
 
         for (offset, (name, uses, _, _)) in enumerate(records):
-            if name:
-                value = f'{name} ({uses} uses)'
-            else:
-                value = 'Nothing!'
-
+            value = f'{name} ({uses} uses)' if name else 'Nothing!'
             e.add_field(name=f'{chr(emoji + offset)} Owned Tag', value=value)
 
         await ctx.send(embed=e)
@@ -671,19 +667,18 @@ class Tags(commands.Cog):
         if content is None:
             if ctx.interaction is None:
                 raise commands.BadArgument('Missing content to edit tag with')
-            else:
-                query = "SELECT content FROM tags WHERE LOWER(name)=$1 AND location_id=$2 AND owner_id=$3"
-                row: Optional[tuple[str]] = await ctx.db.fetchrow(query, name, ctx.guild.id, ctx.author.id)
-                if row is None:
-                    await ctx.send(
-                        'Could not find a tag with that name, are you sure it exists or you own it?', ephemeral=True
-                    )
-                    return
-                modal = TagEditModal(row[0])
-                await ctx.interaction.response.send_modal(modal)
-                await modal.wait()
-                ctx.interaction = modal.interaction
-                content = modal.text
+            query = "SELECT content FROM tags WHERE LOWER(name)=$1 AND location_id=$2 AND owner_id=$3"
+            row: Optional[tuple[str]] = await ctx.db.fetchrow(query, name, ctx.guild.id, ctx.author.id)
+            if row is None:
+                await ctx.send(
+                    'Could not find a tag with that name, are you sure it exists or you own it?', ephemeral=True
+                )
+                return
+            modal = TagEditModal(row[0])
+            await ctx.interaction.response.send_modal(modal)
+            await modal.wait()
+            ctx.interaction = modal.interaction
+            content = modal.text
 
         if len(content) > 2000:
             return await ctx.send('Tag content can only be up to 2000 characters')

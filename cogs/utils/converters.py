@@ -15,7 +15,6 @@ class Snowflake:
         try:
             return int(argument)
         except ValueError:
-            param = ctx.current_parameter
-            if param:
+            if param := ctx.current_parameter:
                 raise commands.BadArgument(f'{param.name} argument expected a Discord ID not {argument!r}')
             raise commands.BadArgument(f'expected a Discord ID not {argument!r}')

@@ -108,10 +108,7 @@ def contributor_or_higher():
             return False
 
         role = discord.utils.find(lambda r: r.id == CONTRIBUTORS_ROLE, guild.roles)
-        if role is None:
-            return False
-
-        return ctx.author.top_role >= role
+        return False if role is None else ctx.author.top_role >= role
 
     return commands.check(predicate)
 
@@ -247,7 +244,7 @@ class API(commands.Cog):
         cache: dict[str, dict[str, str]] = {}
         for key, page in RTFM_PAGE_TYPES.items():
             cache[key] = {}
-            async with self.bot.session.get(page + '/objects.inv') as resp:
+            async with self.bot.session.get(f'{page}/objects.inv') as resp:
                 if resp.status != 200:
                     raise RuntimeError('Cannot build rtfm lookup table, try again later.')
 
@@ -295,10 +292,9 @@ class API(commands.Cog):
         if ctx.guild is not None:
             #                             日本語 category
             if ctx.channel.category_id == DISCORD_PY_JP_CATEGORY:  # type: ignore  # category_id is safe to access
-                return prefix + '-jp'
-            #                    d.py unofficial JP   Discord Bot Portal JP
+                return f'{prefix}-jp'
             elif ctx.guild.id in (463986890190749698, 494911447420108820):
-                return prefix + '-jp'
+                return f'{prefix}-jp'
         return prefix
 
     async def rtfm_slash_autocomplete(
@@ -386,11 +382,7 @@ class API(commands.Cog):
         query = 'SELECT count FROM rtfm WHERE user_id=$1;'
         record = await ctx.db.fetchrow(query, member.id)
 
-        if record is None:
-            count = 0
-        else:
-            count = record['count']
-
+        count = 0 if record is None else record['count']
         e.add_field(name='Uses', value=count)
         e.add_field(name='Percentage', value=f'{count/total_uses:.2%} out of {total_uses}')
         e.colour = discord.Colour.blurple()
@@ -410,9 +402,7 @@ class API(commands.Cog):
         query = 'SELECT user_id, count FROM rtfm ORDER BY count DESC LIMIT 10;'
         records: list[Record] = await ctx.db.fetch(query)
 
-        output = []
-        output.append(f'**Total uses**: {total_uses}')
-
+        output = [f'**Total uses**: {total_uses}']
         # first we get the most used users
         if records:
             output.append(f'**Top {len(records)} users**:')
@@ -644,7 +634,7 @@ class API(commands.Cog):
 
         name = name.lower()
 
-        if name in ('@everyone', '@here'):
+        if name in {'@everyone', '@here'}:
             return await ctx.send('That is an invalid feed name.')
 
         query = 'SELECT role_id FROM feeds WHERE channel_id=$1 AND name=$2;'
@@ -656,7 +646,7 @@ class API(commands.Cog):
 
         # create the role
         if ctx.guild.id == DISCORD_API_ID:
-            role_name = self.library_name(ctx.channel) + ' ' + name
+            role_name = f'{self.library_name(ctx.channel)} {name}'
         else:
             role_name = name
 
@@ -813,9 +803,10 @@ class API(commands.Cog):
             return []
 
         if not current:
-            choices = [app_commands.Choice(name=key, value=key) for key in self.faq_entries][:10]
-            return choices
-
+            return [
+                app_commands.Choice(name=key, value=key)
+                for key in self.faq_entries
+            ][:10]
         matches = fuzzy.extract_matches(current, self.faq_entries, scorer=fuzzy.partial_ratio, score_cutoff=40)[:10]
         return [app_commands.Choice(name=key, value=key) for key, _, _, in matches][:10]
 

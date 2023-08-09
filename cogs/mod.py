@@ -297,9 +297,7 @@ class IgnoreEntity(commands.Converter):
 
 def safe_reason_append(base: str, to_append: str) -> str:
     appended = f'{base} ({to_append})'
-    if len(appended) > 512:
-        return base
-    return appended
+    return base if len(appended) > 512 else appended
 
 
 class MassbanFlags(commands.FlagConverter):
@@ -445,10 +443,7 @@ class SpamChecker:
             return True
 
         content_bucket = self.by_content.get_bucket(message)
-        if content_bucket and content_bucket.update_rate_limit(current):
-            return True
-
-        return False
+        return bool(content_bucket and content_bucket.update_rate_limit(current))
 
     def is_fast_join(self, member: discord.Member) -> bool:
         joined = member.joined_at or discord.utils.utcnow()
@@ -622,9 +617,7 @@ class Mod(commands.Cog):
         query = """SELECT * FROM guild_mod_config WHERE id=$1;"""
         async with self.bot.pool.acquire(timeout=300.0) as con:
             record = await con.fetchrow(query, guild_id)
-            if record is not None:
-                return ModConfig.from_record(record, self.bot)
-            return None
+            return ModConfig.from_record(record, self.bot) if record is not None else None
 
     async def check_raid(self, config: ModConfig, guild_id: int, member: discord.Member, message: discord.Message) -> None:
         if not config.automod_flags.raid:
@@ -899,9 +892,7 @@ class Mod(commands.Cog):
             def resolve_entity_id(x: int):
                 if ctx.guild.get_role(x):
                     return f'<@&{x}>'
-                if ctx.guild.get_channel_or_thread(x):
-                    return f'<#{x}>'
-                return f'<@{x}>'
+                return f'<#{x}>' if ctx.guild.get_channel_or_thread(x) else f'<@{x}>'
 
             if len(config.safe_automod_entity_ids) <= 5:
                 ignored = '\n'.join(resolve_entity_id(c) for c in config.safe_automod_entity_ids)
@@ -986,7 +977,9 @@ class Mod(commands.Cog):
         try:
             webhook = await channel.create_webhook(name='RoboMod Join Logs', avatar=self._avatar, reason=reason)
         except discord.Forbidden:
-            raise RuntimeError(f'The bot does not have permissions to create webhooks.') from None
+            raise RuntimeError(
+                'The bot does not have permissions to create webhooks.'
+            ) from None
         except discord.HTTPException:
             raise RuntimeError(
                 'An error occurred while creating the webhook. Note you can only have 10 webhooks per channel.'
@@ -1180,9 +1173,7 @@ class Mod(commands.Cog):
         def resolve_entity_id(x: int, *, guild=ctx.guild):
             if guild.get_role(x):
                 return f'<@&{x}>'
-            if guild.get_channel_or_thread(x):
-                return f'<#{x}>'
-            return f'<@{x}>'
+            return f'<#{x}>' if guild.get_channel_or_thread(x) else f'<@{x}>'
 
         entities = [resolve_entity_id(x) for x in config.safe_automod_entity_ids]
         pages = SimplePages(entities, ctx=ctx, per_page=20)
@@ -1191,7 +1182,7 @@ class Mod(commands.Cog):
     async def _basic_cleanup_strategy(self, ctx: GuildContext, search: int):
         count = 0
         async for msg in ctx.history(limit=search, before=ctx.message):
-            if msg.author == ctx.me and not (msg.mentions or msg.role_mentions):
+            if msg.author == ctx.me and not msg.mentions and not msg.role_mentions:
                 await msg.delete()
                 count += 1
         return {'Bot': count}
@@ -1209,7 +1200,11 @@ class Mod(commands.Cog):
         prefixes = tuple(self.bot.get_guild_prefixes(ctx.guild))
 
         def check(m):
-            return (m.author == ctx.me or m.content.startswith(prefixes)) and not (m.mentions or m.role_mentions)
+            return (
+                (m.author == ctx.me or m.content.startswith(prefixes))
+                and not m.mentions
+                and not m.role_mentions
+            )
 
         deleted = await ctx.channel.purge(limit=search, check=check, before=ctx.message)
         return Counter(m.author.display_name for m in deleted)
@@ -1238,11 +1233,7 @@ class Mod(commands.Cog):
             else:
                 strategy = self._regular_user_cleanup_strategy
 
-        if is_mod:
-            search = min(max(2, search), 1000)
-        else:
-            search = min(max(2, search), 25)
-
+        search = min(max(2, search), 1000) if is_mod else min(max(2, search), 25)
         spammers = await strategy(ctx, search)
         deleted = sum(spammers.values())
         messages = [f'{deleted} message{" was" if deleted == 1 else "s were"} removed.']
@@ -1468,7 +1459,7 @@ class Mod(commands.Cog):
             return await ctx.send('Missing at least one filter to use')
 
         members = {m for m in members if all(p(m) for p in predicates)}
-        if len(members) == 0:
+        if not members:
             return await ctx.send('No members found matching criteria.')
 
         if args.show:

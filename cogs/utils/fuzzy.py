@@ -41,7 +41,7 @@ def partial_ratio(a: str, b: str) -> int:
         o = SequenceMatcher(None, short, long[start:end])
         r = o.ratio()
 
-        if 100 * r > 99:
+        if r > 99 / 100:
             return 100
         scores.append(r)
 
@@ -232,10 +232,7 @@ def extract_or_exact(
     second = matches[1][1]
 
     # check if the top one is exact or more than 30% more correct than the top
-    if top == 100 or top > (second + 30):
-        return [matches[0]]  # type: ignore
-
-    return matches
+    return [matches[0]] if top == 100 or top > (second + 30) else matches
 
 
 @overload
@@ -330,7 +327,7 @@ def finder(
     raw: bool = False,
 ) -> list[tuple[int, int, T]] | list[T]:
     suggestions: list[tuple[int, int, T]] = []
-    text = str(text)
+    text = text
     pat = '.*?'.join(map(re.escape, text))
     regex = re.compile(pat, flags=re.IGNORECASE)
     for item in collection:
@@ -340,9 +337,7 @@ def finder(
             suggestions.append((len(r.group()), r.start(), item))
 
     def sort_key(tup: tuple[int, int, T]) -> tuple[int, int, str | T]:
-        if key:
-            return tup[0], tup[1], key(tup[2])
-        return tup
+        return (tup[0], tup[1], key(tup[2])) if key else tup
 
     if raw:
         return sorted(suggestions, key=sort_key)

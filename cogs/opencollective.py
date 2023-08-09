@@ -201,10 +201,10 @@ class OpenCollective(commands.Cog):
 
         async with self.bot.session.post(url, data=data, headers=headers) as resp:
             data = await resp.json()
-            if resp.status != 200 and 'error' in data and data['error'] == 'invalid_grant':
-                raise TokenRevoked
-
             if resp.status != 200:
+                if 'error' in data and data['error'] == 'invalid_grant':
+                    raise TokenRevoked
+
                 raise RuntimeError(f'Discord responded with non-200 {resp.status}')
 
             return data

@@ -40,7 +40,7 @@ def validate_token(token: str) -> bool:
     try:
         # Just check if the first part validates as a user ID
         (user_id, _, _) = token.split('.')
-        user_id = int(base64.b64decode(user_id + '==', validate=True))
+        user_id = int(base64.b64decode(f'{user_id}==', validate=True))
     except (ValueError, binascii.Error):
         return False
     else:
@@ -116,8 +116,7 @@ class UnsolvedFlags(commands.FlagConverter):
 def make_field_from_note(data: dict[str, Any], column_id: int) -> tuple[str, str]:
     id = data['id']
     value = data['note']
-    issue = data.get('content_url')
-    if issue:
+    if issue := data.get('content_url'):
         issue = issue.replace('api.github.com/repos', 'github.com')
         _, _, number = issue.rpartition('/')
         value = f'[#{number}]({issue})'
@@ -177,7 +176,7 @@ class DPYExclusive(commands.Cog, name='discord.py'):
         req_url = yarl.URL('https://api.github.com') / url
 
         if headers is not None and isinstance(headers, dict):
-            hdrs.update(headers)
+            hdrs |= headers
 
         async with self._req_lock:
             async with self.bot.session.request(method, req_url, params=params, json=data, headers=hdrs) as r:
@@ -289,12 +288,8 @@ class DPYExclusive(commands.Cog, name='discord.py'):
 
             matches = emoji.find_all_emoji(message)
             # Don't want multiple emoji per message
-            if len(matches) > 1:
+            if len(matches) > 1 or len(message.attachments) > 1:
                 return await message.delete()
-            elif len(message.attachments) > 1:
-                # Nor multiple attachments
-                return await message.delete()
-
             # Add voting reactions
             await message.add_reaction('<:greenTick:330090705336664065>')
             await message.add_reaction('<:redTick:330090723011592193>')
@@ -379,8 +374,7 @@ class DPYExclusive(commands.Cog, name='discord.py'):
             current_labels = {e['name'] for e in issue.get('labels', [])}
             valid_labels = await self.get_valid_labels()
             label_set = set(labels)
-            diff = [repr(x) for x in (label_set - valid_labels)]
-            if diff:
+            if diff := [repr(x) for x in (label_set - valid_labels)]:
                 raise GithubError(f'Invalid labels passed: {human_join(diff, final="and")}')
             data['labels'] = list(current_labels | label_set)
 
@@ -506,7 +500,7 @@ class DPYExclusive(commands.Cog, name='discord.py'):
     async def mark_as_solved(self, thread: discord.Thread, user: discord.abc.User) -> None:
         tags: Sequence[discord.abc.Snowflake] = thread.applied_tags
 
-        if not any(tag.id == DISCORD_PY_SOLVED_TAG for tag in tags):
+        if all(tag.id != DISCORD_PY_SOLVED_TAG for tag in tags):
             tags.append(discord.Object(id=DISCORD_PY_SOLVED_TAG))  # type: ignore
 
         await thread.edit(
@@ -536,7 +530,7 @@ class DPYExclusive(commands.Cog, name='discord.py'):
 
             if confirm:
                 await ctx.send(
-                    f'Marking as solved. Note that next time, you can mark the thread as solved yourself with `?solved`.'
+                    'Marking as solved. Note that next time, you can mark the thread as solved yourself with `?solved`.'
                 )
                 await self.mark_as_solved(ctx.channel, ctx.channel.owner or ctx.author)
             elif confirm is None:
